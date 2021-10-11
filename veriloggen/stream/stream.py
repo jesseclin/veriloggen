@@ -34,11 +34,15 @@ def reset():
 def StreamManager(module, clock, reset,
                   ivalid=None, iready=None,
                   ovalid=None, oready=None,
-                  aswire=True, no_hook=False):
+                  aswire=True, no_hook=False, rtype=(None,None)):
+    rst_tim = rtype[0] if rtype[0] is not None else \
+                  "ASYNC" if os.environ.get("RESET_ASYNC") is not None and os.environ.get("RESET_ASYNC")=='Y' else "SYNC"
+    rst_pol = rtype[1] if rtype[1] is not None else \
+                  "ACTIVE_LOW" if os.environ.get("RESET_ACTIVE_LOW") is not None and os.environ.get("RESET_ACTIVE_LOW")=='Y' else "ACTIVE_HIGH"
     return Stream(module=module, clock=clock, reset=reset,
                   ivalid=ivalid, iready=iready,
                   ovalid=ovalid, oready=oready,
-                  aswire=aswire, no_hook=no_hook)
+                  aswire=aswire, no_hook=no_hook, rtype=(rst_tim,rst_pol))
 
 
 class Stream(object):
@@ -61,6 +65,9 @@ class Stream(object):
         self.module = opts['module'] if 'module' in opts else None
         self.clock = opts['clock'] if 'clock' in opts else None
         self.reset = opts['reset'] if 'reset' in opts else None
+        rst_tim = "ASYNC" if os.environ.get("RESET_ASYNC") is not None and os.environ.get("RESET_ASYNC")=='Y' else "SYNC"
+        rst_pol = "ACTIVE_LOW" if os.environ.get("RESET_ACTIVE_LOW") is not None and os.environ.get("RESET_ACTIVE_LOW")=='Y' else "ACTIVE_HIGH"
+        self.rtype = opts['rtype'] if 'rtype' in opts else (rst_tim,rst_pol)
 
         self.ivalid = opts['ivalid'] if 'ivalid' in opts else None
         self.iready = opts['iready'] if 'iready' in opts else None
@@ -86,7 +93,7 @@ class Stream(object):
 
             seq_name = (opts['seq_name'] if 'seq_name' in opts else
                         '_stream_seq_%d' % self.object_id)
-            self.seq = Seq(self.module, seq_name, self.clock, self.reset)
+            self.seq = Seq(self.module, seq_name, self.clock, self.reset, rtype=self.rtype)
 
         if self.dump:
             dump_enable_name = '_stream_dump_enable_%d' % self.object_id
@@ -133,12 +140,12 @@ class Stream(object):
         clk = m.Input(clock)
         rst = m.Input(reset)
 
-        m = self.implement(m, clk, rst, aswire=aswire, seq_name=seq_name)
+        m = self.implement(m, clk, rst, aswire=aswire, seq_name=seq_name, rtype=self.rtype)
 
         return m
 
     # -------------------------------------------------------------------------
-    def implement(self, m=None, clock=None, reset=None, aswire=None, seq_name=None):
+    def implement(self, m=None, clock=None, reset=None, aswire=None, seq_name=None, rtype=("SYNC","ACTIVE_HIGH")):
         """ implemente actual registers and operations in Verilog """
 
         if self.implemented:
@@ -160,10 +167,13 @@ class Stream(object):
         if reset is None:
             reset = self.reset
 
+        if rtype is None:
+            rtype = self.rtype
+
         if self.seq is None:
             if seq_name is None:
                 seq_name = '_stream_seq_%d' % self.object_id
-            seq = Seq(m, seq_name, clock, reset)
+            seq = Seq(m, seq_name, clock, reset, rtype=rtype)
         else:
             seq = self.seq
 
@@ -192,6 +202,7 @@ class Stream(object):
         # add input ports
         for input_var in sorted(input_vars, key=lambda x: x.object_id):
             input_var._implement_input(m, seq, aswire)
+            #print(seq.rtype)
 
         # schedule
         sched = scheduler.ASAPScheduler()
@@ -241,7 +252,6 @@ class Stream(object):
 
         if self.dump:
             self.add_dump(m, seq, input_vars, output_vars, all_vars)
-
         return m
 
     def add_dump(self, m, seq, input_vars, output_vars, all_vars):

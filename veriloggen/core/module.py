@@ -921,7 +921,7 @@ class Module(vtypes.VeriloggenNode):
 
     # -------------------------------------------------------------------------
     def connect_params(self, targ, prefix=None, postfix=None,
-                       include=None, exclude=None, strict=False):
+                       include=None, exclude=None, strict=False, use_fullmatch=False):
         if prefix is None:
             prefix = ''
         if postfix is None:
@@ -964,7 +964,7 @@ class Module(vtypes.VeriloggenNode):
         return ret
 
     def connect_ports(self, targ, prefix=None, postfix=None,
-                      include=None, exclude=None, strict=False):
+                      include=None, exclude=None, strict=False, use_fullmatch=False):
         if prefix is None:
             prefix = ''
         if postfix is None:

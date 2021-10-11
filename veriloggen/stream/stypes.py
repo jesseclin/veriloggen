@@ -49,7 +49,7 @@ def Variable(data=None, width=32, point=0, signed=True):
 def Parameter(name, value, width=32, point=0, signed=True):
     """ parameter with an immediate value """
     if not isinstance(name, str):
-        raise TypeError("'name' must be str, not '%s'" % str(tyep(name)))
+        raise TypeError("'name' must be str, not '%s'" % str(type(name)))
     return _ParameterVariable(name, width, point, signed, value=value)
 
 
@@ -491,6 +491,7 @@ class _BinaryOperator(_Operator):
         self._set_seq(getattr(self.strm, 'seq', None))
 
     def _implement(self, m, seq, svalid=None, senable=None):
+#        print(self.latency)
         width = self.get_width()
         signed = self.get_signed()
 
@@ -748,7 +749,7 @@ class Divide(_BinaryOperator):
 
         depth = self.latency - 1
 
-        inst = div.get_div()
+        inst = div.get_div(seq.rtype)
         clk = m._clock
         rst = m._reset
 
@@ -759,10 +760,11 @@ class Divide(_BinaryOperator):
         else:
             m.Assign(update(vtypes.Int(1, 1)))
 
+        rst_name = 'nRST' if seq.rtype[1] == 'ACTIVE_LOW' else 'RST'
         params = [('W_D', width),
                   ('A_SIGNED', 1 if lsigned else 0), ('B_SIGNED', 1 if rsigned else 0),
                   ('O_SIGNED', 1 if signed else 0)]
-        ports = [('CLK', clk), ('RST', rst), ('update', update), ('enable', vtypes.Int(1, 1)),
+        ports = [('CLK', clk), ('{}'.format(rst_name), rst), ('update', update), ('enable', vtypes.Int(1, 1)),
                  ('in_a', ldata), ('in_b', rdata), ('rslt', odata)]
 
         m.Instance(inst, self.name('div'), params, ports)
@@ -815,7 +817,7 @@ class Mod(_BinaryOperator):
 
         depth = self.latency - 1
 
-        inst = div.get_div()
+        inst = div.get_div(seq.rtype)
         clk = m._clock
         rst = m._reset
 
@@ -826,10 +828,11 @@ class Mod(_BinaryOperator):
         else:
             m.Assign(update(vtypes.Int(1, 1)))
 
+        rst_name = 'nRST' if seq.rtype[1] == 'ACTIVE_LOW' else 'RST'
         params = [('W_D', width),
                   ('A_SIGNED', 1 if lsigned else 0), ('B_SIGNED', 1 if rsigned else 0),
                   ('O_SIGNED', 1 if signed else 0)]
-        ports = [('CLK', clk), ('RST', rst), ('update', update), ('enable', vtypes.Int(1, 1)),
+        ports = [('CLK', clk), ('{}'.format(rst_name), rst), ('update', update), ('enable', vtypes.Int(1, 1)),
                  ('in_a', ldata), ('in_b', rdata), ('mod', odata)]
 
         m.Instance(inst, self.name('div'), params, ports)
@@ -903,7 +906,7 @@ class DivideMultiCycle(_BinaryOperator):
 
         m.Assign(data(odata))
 
-        inst = div.get_div()
+        inst = div.get_div(seq.rtype)
         clk = m._clock
         rst = m._reset
 
@@ -911,10 +914,11 @@ class DivideMultiCycle(_BinaryOperator):
 
         m.Assign(update(comp_cond))
 
+        rst_name = 'nRST' if seq.rtype[1] == 'ACTIVE_LOW' else 'RST'
         params = [('W_D', width),
                   ('A_SIGNED', 1 if lsigned else 0), ('B_SIGNED', 1 if rsigned else 0),
                   ('O_SIGNED', 1 if signed else 0)]
-        ports = [('CLK', clk), ('RST', rst), ('update', update), ('enable', vtypes.Int(1, 1)),
+        ports = [('CLK', clk), ('{}'.format(rst_name), rst), ('update', update), ('enable', vtypes.Int(1, 1)),
                  ('in_a', ldata), ('in_b', rdata), ('rslt', odata)]
 
         m.Instance(inst, self.name('div'), params, ports)
@@ -3486,7 +3490,7 @@ class ReduceDiv(_Accumulator):
 
         depth = self.latency - 1
 
-        inst = div.get_div()
+        inst = div.get_div(seq.rtype)
         clk = m._clock
         rst = m._reset
 
@@ -3494,10 +3498,11 @@ class ReduceDiv(_Accumulator):
 
         m.Assign(update(comp_cond))
 
+        rst_name = 'nRST' if seq.rtype[1] == 'ACTIVE_LOW' else 'RST'
         params = [('W_D', width),
                   ('A_SIGNED', 1 if signed else 0), ('B_SIGNED', 1 if rsigned else 0),
                   ('O_SIGNED', 1 if signed else 0)]
-        ports = [('CLK', clk), ('RST', rst), ('update', update), ('enable', vtypes.Int(1, 1)),
+        ports = [('CLK', clk), ('{}'.format(rst_name), rst), ('update', update), ('enable', vtypes.Int(1, 1)),
                  ('in_a', ldata), ('in_b', rdata), ('rslt', odata)]
 
         m.Instance(inst, self.name('div'), params, ports)
@@ -5005,7 +5010,7 @@ def ReduceArgMin(right, size=None, interval=None, initval=0,
     _min = ReduceMin(right, size, interval, initval,
                      enable, reset, reg_initval, width, signed)
     counter = Counter(size, dependency=right, enable=enable, reset=reset)
-    update = NotEq(_min, reduce_min.prev(1))
+    update = NotEq(_min, _min.prev(1))
     update.latency = 0
     index = Predicate(counter, update)
     return index, _min

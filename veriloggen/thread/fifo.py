@@ -16,12 +16,13 @@ class FIFO(_MutexFunction):
                       'is_empty', 'is_almost_empty',
                       'is_full', 'is_almost_full') + _MutexFunction.__intrinsics__
 
-    def __init__(self, m, name, clk, rst, datawidth=32, addrwidth=4):
+    def __init__(self, m, name, clk, rst, datawidth=32, addrwidth=4, rtype=("SYNC","HIGH")):
 
         self.m = m
         self.name = name
         self.clk = clk
         self.rst = rst
+        self.rtype = rtype
 
         self.datawidth = datawidth
         self.addrwidth = addrwidth
@@ -34,7 +35,7 @@ class FIFO(_MutexFunction):
         self.inst = self.m.Instance(self.definition, 'inst_' + name,
                                     ports=m.connect_ports(self.definition))
 
-        self.seq = Seq(m, name, clk, rst)
+        self.seq = Seq(m, name, clk, rst, rtype=rtype)
 
         # entry counter
         self._max_size = (2 ** self.addrwidth - 1 if isinstance(self.addrwidth, int) else

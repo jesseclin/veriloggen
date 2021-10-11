@@ -41,11 +41,16 @@ class FSM(vtypes.VeriloggenNode):
     """ Finite State Machine Generator """
 
     def __init__(self, m, name, clk, rst, width=32, initname='init',
-                 nohook=False, as_module=False):
+                 nohook=False, as_module=False, rtype=(None,None)):
         self.m = m
         self.name = name
         self.clk = clk
         self.rst = rst
+        rst_tim = rtype[0] if rtype[0] is not None else \
+                  "ASYNC" if os.environ.get("RESET_ASYNC") is not None and os.environ.get("RESET_ASYNC")=='Y' else "SYNC"
+        rst_pol = rtype[1] if rtype[1] is not None else \
+                  "ACTIVE_LOW" if os.environ.get("RESET_ACTIVE_LOW") is not None and os.environ.get("RESET_ACTIVE_LOW")=='Y' else "ACTIVE_HIGH"
+        self.rtype = (rst_tim, rst_pol)
         self.width = width
         self.state_count = 0
         self.state = self.m.Reg(name, width)  # set initval later
@@ -68,7 +73,7 @@ class FSM(vtypes.VeriloggenNode):
         self.dst_visitor = SubstDstVisitor()
         self.reset_visitor = ResetVisitor()
 
-        self.seq = Seq(self.m, self.name + '_par', clk, rst, nohook=True)
+        self.seq = Seq(self.m, self.name + '_par', clk, rst, nohook=True, rtype=self.rtype)
 
         self.done = False
 
@@ -319,7 +324,7 @@ class FSM(vtypes.VeriloggenNode):
 
     def State(self, index=None):
         if index is None:
-            index = fsm.current
+            index = self.current
         return State(self, index)
 
     def Clear(self):
@@ -387,7 +392,7 @@ class FSM(vtypes.VeriloggenNode):
     # -------------------------------------------------------------------------
     def implement(self):
         if self.as_module:
-            self.make_module()
+            self.make_module(rtype=self.rtype)
             return
 
         self.make_always()
@@ -403,15 +408,40 @@ class FSM(vtypes.VeriloggenNode):
         part_reset = self.make_reset(reset)
         part_body = list(body) + list(self.make_case()
                                       if case else self.make_if())
-        self.m.Always(vtypes.Posedge(self.clk))(
-            vtypes.If(self.rst)(
-                part_reset,
-            )(
-                part_body,
-            ))
+        
+        if self.rtype[0] == "ASYNC":
+            if self.rtype[1] == "ACTIVE_LOW":
+                self.m.Always(vtypes.Posedge(self.clk), vtypes.Negedge(self.rst))(
+                    vtypes.If(~self.rst)(
+                        part_reset,
+                    )(
+                        part_body,
+                    ))
+            else:
+                self.m.Always(vtypes.Posedge(self.clk), vtypes.Negedge(self.rst))(
+                    vtypes.If(self.rst)(
+                        part_reset,
+                    )(
+                        part_body,
+                    ))
+        else:
+            if self.rtype[1] == "ACTIVE_LOW":
+                self.m.Always(vtypes.Posedge(self.clk))(
+                    vtypes.If(~self.rst)(
+                        part_reset,
+                    )(
+                        part_body,
+                    ))
+            else:
+                self.m.Always(vtypes.Posedge(self.clk))(
+                    vtypes.If(self.rst)(
+                        part_reset,
+                    )(
+                        part_body,
+                    ))
 
     # -------------------------------------------------------------------------
-    def make_module(self, reset=(), body=(), case=True):
+    def make_module(self, reset=(), body=(), case=True, rtype=("SYNC","ACTIVE_HIGH")):
         if self.done:
             #raise ValueError('make_always() has been already called.')
             return
@@ -423,7 +453,10 @@ class FSM(vtypes.VeriloggenNode):
         clk = m.Input('CLK')
 
         if self.rst is not None:
-            rst = m.Input('RST')
+            if rtype[1] == "ACTIVE_LOW":
+                rst = m.Input('nRST')
+            else:
+                rst = m.Input('RST')
         else:
             rst = None
 
@@ -644,18 +677,51 @@ class FSM(vtypes.VeriloggenNode):
                 body,
             )
         else:
-            m.Always(vtypes.Posedge(clk))(
-                vtypes.If(rst)(
-                    reset,
-                )(
-                    body,
-                ))
+            #m.Always(vtypes.Posedge(clk))(
+            #    vtypes.If(rst)(
+            #        reset,
+            #    )(
+            #        body,
+            #    ))
+            if rtype[0] == "ASYNC":
+                if rtype[1] == "ACTIVE_LOW":
+                    m.Always(vtypes.Posedge(clk), vtypes.Negedge(rst))(
+                        vtypes.If(~rst)(
+                            reset,
+                        )(
+                            body,
+                        ))
+                else:
+                    m.Always(vtypes.Posedge(clk), vtypes.Posedge(rst))(
+                        vtypes.If(rst)(
+                            reset,
+                        )(
+                            body,
+                        ))
+            else:
+                if rtype[1] == "ACTIVE_LOW":
+                    m.Always(vtypes.Posedge(clk))(
+                        vtypes.If(~rst)(
+                            reset,
+                        )(
+                            body,
+                        ))
+                else:
+                    m.Always(vtypes.Posedge(clk))(
+                        vtypes.If(rst)(
+                            reset,
+                        )(
+                            body,
+                        ))
 
         arg_params = [(name, param) for name, param in params.items()]
 
         arg_ports = [('CLK', self.clk)]
         if self.rst is not None:
-            arg_ports.append(('RST', self.rst))
+            if rtype[1] == "ACTIVE_LOW":
+                arg_ports.append(('nRST', self.rst))
+            else:
+                arg_ports.append(('RST', self.rst))
 
         arg_ports.extend([(name, port) for name, port in ports.items()])
 

@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
+from string import Template
 import veriloggen.verilog.from_verilog as from_verilog
 
 divider_code = """\
@@ -13,7 +14,7 @@ module Divider #
    )
   (
    input CLK,
-   input RST,
+   input $P_RST,
    input [W_D-1:0] in_a,
    input [W_D-1:0] in_b,
    input update,
@@ -77,8 +78,8 @@ module Divider #
       assign is_large = !sub_value[W_D*2-1];
 
       if(d == 0) begin
-        always @(posedge CLK) begin
-          if(RST) begin
+        always @(posedge CLK$SEN_EXTRA) begin
+          if($POL$P_RST) begin
             stage_valid   <= 0;
             in_a_positive <= 0;
             in_b_positive <= 0;
@@ -89,8 +90,8 @@ module Divider #
           end
         end
       end else begin
-        always @(posedge CLK) begin
-          if(RST) begin
+        always @(posedge CLK$SEN_EXTRA) begin
+          if($POL$P_RST) begin
             stage_valid   <= 0;
             in_a_positive <= 0;
             in_b_positive <= 0;
@@ -122,8 +123,8 @@ module Divider #
     end
   endgenerate
 
-  always @(posedge CLK) begin
-    if(RST) begin
+  always @(posedge CLK$SEN_EXTRA) begin
+    if($POL$P_RST) begin
       valid <= 0;
     end else if(update) begin
       valid <= s_depth[DEPTH-1].stage_valid;
@@ -166,12 +167,39 @@ endmodule
 """
 
 # global multiplier definition
-div = None
+div  = [None,None,None,None]
 
 
-def get_div():
+def get_div(rtype=(None, None)):
     global div
-    if div is None:
-        __m = from_verilog.read_verilog_module_str(divider_code)
-        div = __m['Divider']
-    return div
+    
+    id  = 1 if rtype[0] == "ASYNC" else 0
+    id += 2 if rtype[1] == "ACTIVE_LOW" else 0
+
+    if id==1:
+        if div[1] is None:
+          t = Template(divider_code)
+          s = t.substitute(P_RST='RST', POL='', SEN_EXTRA=' or posedge RST')
+          __m = from_verilog.read_verilog_module_str(s)
+          div[1] = __m['Divider']
+        return div[1]
+    elif id==2:
+        if div[2] is None:
+          t = Template(divider_code)
+          s = t.substitute(P_RST='nRST', POL='~', SEN_EXTRA='')
+          __m = from_verilog.read_verilog_module_str(s)
+          div[2] = __m['Divider']
+        return div[2]
+    elif id==3:
+        if div[3] is None:
+          t = Template(divider_code)
+          s = t.substitute(P_RST='nRST', POL='~', SEN_EXTRA=' or negedge nRST')
+          __m = from_verilog.read_verilog_module_str(s)
+          div[3] = __m['Divider']
+        return div[3]
+    else:
+        t = Template(divider_code)
+        s = t.substitute(P_RST='RST', POL='', SEN_EXTRA='')
+        __m = from_verilog.read_verilog_module_str(s)
+        div[0] = __m['Divider']
+        return div[0]

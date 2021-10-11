@@ -69,11 +69,18 @@ def TmpSeq(m, clk, rst=None, nohook=False, as_module=False, prefix=None):
 class Seq(vtypes.VeriloggenNode):
     """ Sequential Logic Manager """
 
-    def __init__(self, m, name, clk, rst=None, nohook=False, as_module=False):
+    def __init__(self, m, name, clk, rst=None, nohook=False, as_module=False, rtype=(None,None)):
         self.m = m
         self.name = name
         self.clk = clk
         self.rst = rst
+        rst_tim = rtype[0] if rtype[0] is not None else \
+                  "ASYNC" if os.environ.get("RESET_ASYNC") is not None and os.environ.get("RESET_ASYNC")=='Y' else "SYNC"
+        rst_pol = rtype[1] if rtype[1] is not None else \
+                  "ACTIVE_LOW" if os.environ.get("RESET_ACTIVE_LOW") is not None and os.environ.get("RESET_ACTIVE_LOW")=='Y' else "ACTIVE_HIGH"
+        self.rtype = (rst_tim, rst_pol)
+
+        #print(self.rtype)
 
         self.tmp_count = 0
         self.delay_amount = 0
@@ -362,7 +369,7 @@ class Seq(vtypes.VeriloggenNode):
     # -------------------------------------------------------------------------
     def implement(self):
         if self.as_module:
-            self.make_module()
+            self.make_module(rtype=self.rtype)
             return
 
         self.make_always()
@@ -385,15 +392,38 @@ class Seq(vtypes.VeriloggenNode):
                 part_body,
             )
         else:
-            self.m.Always(vtypes.Posedge(self.clk))(
-                vtypes.If(self.rst)(
-                    part_reset,
-                )(
-                    part_body,
-                ))
-
+            if self.rtype[0] == "ASYNC":
+                if self.rtype[1] == "ACTIVE_LOW":
+                    self.m.Always(vtypes.Posedge(self.clk), vtypes.Negedge(self.rst))(
+                        vtypes.If(~self.rst)(
+                            part_reset,
+                        )(
+                            part_body,
+                        ))
+                else:
+                    self.m.Always(vtypes.Posedge(self.clk), vtypes.Posedge(self.rst))(
+                        vtypes.If(self.rst)(
+                            part_reset,
+                        )(
+                            part_body,
+                        ))
+            else:
+                if self.rtype[1] == "ACTIVE_LOW":
+                    self.m.Always(vtypes.Posedge(self.clk))(
+                        vtypes.If(~self.rst)(
+                            part_reset,
+                        )(
+                            part_body,
+                        ))
+                else:
+                    self.m.Always(vtypes.Posedge(self.clk))(
+                        vtypes.If(self.rst)(
+                            part_reset,
+                        )(
+                            part_body,
+                        ))
     # -------------------------------------------------------------------------
-    def make_module(self, reset=(), body=()):
+    def make_module(self, reset=(), body=(), rtype=("SYNC","ACTIVE_HIGH")):
         if self.done:
             #raise ValueError('make_always() has been already called.')
             return
@@ -405,7 +435,10 @@ class Seq(vtypes.VeriloggenNode):
         clk = m.Input('CLK')
 
         if self.rst is not None:
-            rst = m.Input('RST')
+            if rtype[1]=="ACTIVE_LOW":
+                rst = m.Input('nRST')
+            else:
+                rst = m.Input('RST')
         else:
             rst = None
 
@@ -579,18 +612,51 @@ class Seq(vtypes.VeriloggenNode):
                 body,
             )
         else:
-            m.Always(vtypes.Posedge(clk))(
-                vtypes.If(rst)(
-                    reset,
-                )(
-                    body,
-                ))
+            #m.Always(vtypes.Posedge(clk))(
+            #    vtypes.If(rst)(
+            #        reset,
+            #    )(
+            #        body,
+            #    ))
+            if rtype[0] == "ASYNC":
+                if rtype[1] == "ACTIVE_LOW":
+                    m.Always(vtypes.Posedge(clk), vtypes.Negedge(rst))(
+                        vtypes.If(~rst)(
+                            reset,
+                        )(
+                            body,
+                        ))
+                else:
+                    m.Always(vtypes.Posedge(clk), vtypes.Posedge(rst))(
+                        vtypes.If(rst)(
+                            reset,
+                        )(
+                            body,
+                        ))
+            else:
+                if rtype[1] == "ACTIVE_LOW":
+                    m.Always(vtypes.Posedge(clk))(
+                        vtypes.If(~rst)(
+                            reset,
+                        )(
+                            body,
+                        ))
+                else:
+                    m.Always(vtypes.Posedge(clk))(
+                        vtypes.If(rst)(
+                            reset,
+                        )(
+                            body,
+                        ))
 
         arg_params = [(name, param) for name, param in params.items()]
 
         arg_ports = [('CLK', self.clk)]
         if self.rst is not None:
-            arg_ports.append(('RST', self.rst))
+            if rtype[1] == "ACTIVE_LOW":
+                arg_ports.append(('nRST', self.rst))
+            else:
+                arg_ports.append(('RST', self.rst))
 
         arg_ports.extend([(name, port) for name, port in ports.items()])
 
