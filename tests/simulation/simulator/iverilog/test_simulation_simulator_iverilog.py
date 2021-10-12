@@ -214,5 +214,6 @@ def test():
 
     sim = simulation.Simulator(test_module, sim='iverilog')
     rslt = sim.run()
-    
-    assert(expected_rslt == rslt)
+    ver_rslt = '\n'.join(rslt.splitlines()[:-1])
+    exp_rslt = '\n'.join(expected_rslt.splitlines())
+    assert(ver_rslt == exp_rslt)
