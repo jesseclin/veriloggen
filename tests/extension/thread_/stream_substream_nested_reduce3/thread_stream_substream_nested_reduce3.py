@@ -183,6 +183,8 @@ def mkLed():
         print('# mystream')
         check(size // reduce_size, 0, offset)
 
+        vthread.finish()
+
     th = vthread.Thread(m, 'th_comp', clk, rst, comp)
     fsm = th.start(16)
 

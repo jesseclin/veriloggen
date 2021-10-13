@@ -2004,4 +2004,6 @@ def test():
     test_module = simulation_simulator_verilator.mkTest()
     sim = simulation.Simulator(test_module, sim='verilator')
     rslt = sim.run(outputfile='verilator.out', sim_time=1000 * 20)
-    assert(expected_rslt == rslt)
+    ver_rslt = '\n'.join(rslt.splitlines())
+    exp_rslt = '\n'.join(expected_rslt.splitlines())
+    assert(ver_rslt == exp_rslt)

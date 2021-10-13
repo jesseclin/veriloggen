@@ -82,7 +82,7 @@ def mkTest(memimg_name=None):
 
     # simulation.setup_waveform(m, uut)
     simulation.setup_clock(m, clk, hperiod=5)
-    init = simulation.setup_reset(m, rst, m.make_reset(), period=100)
+    init = simulation.setup_reset(m, rst, m.make_reset(), period=10)
 
     init.add(
         Delay(10000),
@@ -105,7 +105,7 @@ def run(filename='tmp.v', simtype='iverilog', outputfile=None):
         test.to_verilog(filename)
 
     sim = simulation.Simulator(test, sim=simtype)
-    rslt = sim.run(outputfile=outputfile)
+    rslt = sim.run(outputfile=outputfile, sim_time=10000*2)
     lines = rslt.splitlines()
     if simtype == 'iverilog' or (simtype == 'verilator' and lines[-1].startswith('-')):
         rslt = '\n'.join(lines[:-1])

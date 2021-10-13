@@ -41,22 +41,24 @@ def read_verilog_module(*filelist, **opt):
 
 
 def read_verilog_module_str(code, encode='utf-8'):
-    tmp = tempfile.NamedTemporaryFile()
+    tmp = tempfile.NamedTemporaryFile(delete=False)
     tmp.write(code.encode(encode))
     tmp.read()
     filename = tmp.name
-    ret = read_verilog_module(filename)
     tmp.close()
+    ret = read_verilog_module(filename)
+    os.unlink(filename)
     return ret
 
 
 def read_verilog_stubmodule_str(code, encode='utf-8'):
-    tmp = tempfile.NamedTemporaryFile()
+    tmp = tempfile.NamedTemporaryFile(delete=False)
     tmp.write(code.encode(encode))
     tmp.read()
     filename = tmp.name
-    ret = read_verilog_stubmodule(filename)
     tmp.close()
+    ret = read_verilog_stubmodule(filename)
+    os.unlink(filename)
     return ret
 
 

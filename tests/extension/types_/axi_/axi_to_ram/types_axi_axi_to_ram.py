@@ -91,13 +91,15 @@ def mkTest(memimg_name=None):
     awready = ports['myaxi_awready']
     _awready = m.TmpWireLike(awready)
     _awready.assign(1)
-    m.Always()(awready(_awready))
+    #m.Always()(awready(_awready))  # Verilator: Warning-COMBDLY
+    m.Initial(awready(_awready))
 
     # wready (nostall)
     wready = ports['myaxi_wready']
     _wready = m.TmpWireLike(wready)
     _wready.assign(1)
-    m.Always()(wready(_wready))
+    #m.Always()(wready(_wready))    # Verilator: Warning-COMBDLY
+    m.Initial(wready(_wready))
 
     # arready (no stall)
     #arready = ports['myaxi_arready']
@@ -190,7 +192,7 @@ def mkTest(memimg_name=None):
 
     # simulation.setup_waveform(m, uut, m.get_vars())
     simulation.setup_clock(m, clk, hperiod=5)
-    init = simulation.setup_reset(m, rst, m.make_reset(), period=100)
+    init = simulation.setup_reset(m, rst, m.make_reset(), period=10)
 
     init.add(
         Delay(1000 * 100),
@@ -213,7 +215,7 @@ def run(filename='tmp.v', simtype='iverilog', outputfile=None):
         test.to_verilog(filename)
 
     sim = simulation.Simulator(test, sim=simtype)
-    rslt = sim.run(outputfile=outputfile)
+    rslt = sim.run(outputfile=outputfile, sim_time=1000*100*2)
     lines = rslt.splitlines()
     if simtype == 'iverilog' or (simtype == 'verilator' and lines[-1].startswith('-')):
         rslt = '\n'.join(lines[:-1])

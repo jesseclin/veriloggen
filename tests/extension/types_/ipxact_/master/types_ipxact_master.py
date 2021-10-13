@@ -114,7 +114,7 @@ def run(filename='tmp.v', simtype='iverilog', outputfile=None):
         test.to_verilog(filename)
 
     sim = simulation.Simulator(test, sim=simtype)
-    rslt = sim.run(outputfile=outputfile)
+    rslt = sim.run(outputfile=outputfile, sim_time=1000*100*2)
     lines = rslt.splitlines()
     if simtype == 'iverilog' or (simtype == 'verilator' and lines[-1].startswith('-')):
         rslt = '\n'.join(lines[:-1])

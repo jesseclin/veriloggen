@@ -35,7 +35,7 @@ def mkLed():
         w(ww)
     )
 
-    rand = m.Wire('rand', 32, signed=True)
+    rand = m.Wire('rand_val', 32, signed=True)
     rand.assign(q)
 
     datawidth = 32

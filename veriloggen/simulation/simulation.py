@@ -493,7 +493,7 @@ def run_verilator(objs, display=False, top=None, outputfile=None,
         outputfile = 'obj_dir'
 
     cmd = []
-    cmd.append('verilator')
+    cmd.append('verilator_bin')
     cmd.append('--cc')
 
     if options is not None:
@@ -569,7 +569,7 @@ def run_verilator(objs, display=False, top=None, outputfile=None,
     cmd = []
 
     if os.name == 'nt':
-        cmd.append(outputfile + '/' + 'V' + verilog_prefix)
+        cmd.append(outputfile + "\\" + 'V' + verilog_prefix)
     else:
         cmd.append('./' + outputfile + '/' + 'V' + verilog_prefix)
 

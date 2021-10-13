@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 from __future__ import print_function
+import os
 import veriloggen
 import from_verilog_branchpredunit
 
@@ -547,14 +548,15 @@ def test():
     # encoding: 'utf-8' ?
     encode = sys.getdefaultencoding()
     
-    tmp = tempfile.NamedTemporaryFile()
-    tmp.write(expected_verilog.encode(encode))
-    tmp.read()
-    filename = tmp.name
-    print(filename)
+    tmp = tempfile.NamedTemporaryFile(delete=False) # According to https://docs.python.org/3/library/tempfile.html#tempfile.NamedTemporaryFile :
+    tmp.write(expected_verilog.encode(encode))      # Whether the name can be used to open the file a second time,
+    filename = tmp.name                             # while the named temporary file is still open, varies across platforms.
+    print(filename)                                 # (it can be so used on Unix; it cannot on Windows NT or later)
+    tmp.close()
     
     expected_ast, _ = parse([ filename ])
     codegen = ASTCodeGenerator()
     expected_code = codegen.visit(expected_ast)
 
+    os.unlink(filename)
     assert(expected_code == code)
